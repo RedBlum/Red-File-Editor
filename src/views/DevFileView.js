@@ -17,6 +17,8 @@ class DevFileView extends ItemView {
         this.filenameEl = null;
         this.languageEl = null;
         this.statusEl = null;
+        this.saveStatusEl = null;
+        this.copyButtonEl = null;
         this.file = null;
         this.filePath = "";
         this.saveTimer = null;
@@ -40,16 +42,28 @@ class DevFileView extends ItemView {
 
     getState() {
         return {
-            file: this.filePath
+            file: this.filePath,
+            autoEnvCompanion: this.autoEnvCompanion,
+            envSourcePath: this.envSourcePath
         };
     }
 
 
     async setState(state) {
-        this.filePath =
+        this.autoEnvCompanion = Boolean(state?.autoEnvCompanion);
+        this.envSourcePath = state?.envSourcePath || null;
+        if (this.autoEnvCompanion) {
+            this.navigation = false;
+        }
+
+        const newPath =
             state && typeof state.file === "string"
                 ? state.file
                 : "";
+
+        const pathChanged = newPath !== this.filePath;
+
+        this.filePath = newPath;
 
         this.file =
             this.filePath
@@ -60,7 +74,9 @@ class DevFileView extends ItemView {
             this.file = null;
         }
 
-        await this.loadCurrentPath();
+        if (pathChanged) {
+            await this.loadCurrentPath();
+        }
     }
 
 
@@ -105,6 +121,8 @@ class DevFileView extends ItemView {
 
 
     requestSave() {
+        this.setSaveStatus("saving");
+
         if (this.saveTimer) {
             clearTimeout(this.saveTimer);
         }
@@ -120,6 +138,11 @@ class DevFileView extends ItemView {
 
 
     async saveNow() {
+        if (this.saveTimer) {
+            clearTimeout(this.saveTimer);
+            this.saveTimer = null;
+        }
+
         if (
             !this.filePath ||
             !this.editor ||
@@ -133,6 +156,7 @@ class DevFileView extends ItemView {
                 this.filePath,
                 this.editor.value
             );
+            this.setSaveStatus("saved");
         }
 
         catch (error) {
@@ -141,6 +165,8 @@ class DevFileView extends ItemView {
                 this.filePath,
                 error
             );
+
+            this.setSaveStatus("error");
 
             new Notice(
                 `Impossible d'enregistrer : ${this.filePath}`
@@ -181,17 +207,58 @@ class DevFileView extends ItemView {
                 cls: "dev-file-editor-header"
             });
 
+        const headerLeft =
+            header.createDiv({
+                cls: "dev-file-editor-header-left"
+            });
 
         this.filenameEl =
-            header.createDiv({
+            headerLeft.createDiv({
                 cls: "dev-file-editor-filename"
             });
 
-
         this.languageEl =
-            header.createDiv({
+            headerLeft.createDiv({
                 cls: "dev-file-editor-language"
             });
+
+        const headerActions =
+            header.createDiv({
+                cls: "dev-file-editor-header-actions"
+            });
+
+        this.copyButtonEl =
+            headerActions.createEl("button", {
+                cls: "dev-file-copy-btn",
+                text: "Copier"
+            });
+        this.copyButtonEl.setAttribute(
+            "title",
+            "Copier tout le contenu"
+        );
+        this.copyButtonEl.addEventListener(
+            "click",
+            async () => {
+                if (!this.editor) return;
+                try {
+                    if (
+                        navigator.clipboard &&
+                        typeof navigator.clipboard.writeText === "function"
+                    ) {
+                        await navigator.clipboard.writeText(this.editor.value);
+                    }
+                    this.copyButtonEl.setText("Copié !");
+                    new Notice("Contenu copié dans le presse-papiers.");
+                    setTimeout(() => {
+                        if (this.copyButtonEl) {
+                            this.copyButtonEl.setText("Copier");
+                        }
+                    }, 1500);
+                } catch (e) {
+                    new Notice("Impossible de copier le contenu.");
+                }
+            }
+        );
 
 
         /*
@@ -261,6 +328,13 @@ class DevFileView extends ItemView {
             footer.createDiv({
                 cls: "dev-file-editor-status"
             });
+
+        this.saveStatusEl =
+            footer.createDiv({
+                cls: "dev-file-editor-save-status"
+            });
+
+        this.setSaveStatus("saved");
 
 
         /*
@@ -479,8 +553,19 @@ class DevFileView extends ItemView {
     }
 
 
-    handleKeyDown(event) {
+    async handleKeyDown(event) {
         if (!this.editor) {
+            return;
+        }
+
+        /*
+         * Cmd/Ctrl + S : Sauvegarde manuelle immédiate
+         */
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+            event.preventDefault();
+            await this.saveNow();
+            const name = this.filePath.split("/").pop() || this.filePath;
+            new Notice(`Enregistré : ${name}`);
             return;
         }
 
@@ -663,6 +748,32 @@ class DevFileView extends ItemView {
             end,
             "select"
         );
+    }
+
+
+    setSaveStatus(status) {
+        if (!this.saveStatusEl) {
+            return;
+        }
+
+        this.saveStatusEl.empty();
+
+        this.saveStatusEl.createSpan({
+            cls: `dev-save-dot mod-${status}`
+        });
+
+        const label =
+            this.saveStatusEl.createSpan({
+                cls: "dev-save-label"
+            });
+
+        if (status === "saving") {
+            label.setText("Enregistrement...");
+        } else if (status === "saved") {
+            label.setText("Enregistré");
+        } else if (status === "error") {
+            label.setText("Erreur");
+        }
     }
 }
 

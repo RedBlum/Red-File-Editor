@@ -2,9 +2,10 @@ const { Modal, Setting, Notice } = require("obsidian");
 
 class CreateFileModal extends Modal {
 
-    constructor(app, plugin) {
+    constructor(app, plugin, targetFolder = null) {
         super(app);
         this.plugin = plugin;
+        this.targetFolder = targetFolder;
         this.filename = "";
     }
 
@@ -18,6 +19,13 @@ class CreateFileModal extends Modal {
         contentEl.createEl("p", {
             text: "Sans extension → .md | Avec extension → extension conservée"
         });
+
+        if (this.targetFolder) {
+            contentEl.createEl("p", {
+                cls: "setting-item-description",
+                text: `Dossier cible : ${this.targetFolder}/`
+            });
+        }
 
         new Setting(contentEl)
             .setName("Nom du fichier")
@@ -63,7 +71,7 @@ class CreateFileModal extends Modal {
         }
 
         this.close();
-        await this.plugin.createFile(this.filename);
+        await this.plugin.createFile(this.filename, this.targetFolder);
     }
 
     onClose() {

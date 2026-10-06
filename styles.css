@@ -1,0 +1,385 @@
+/* ==========================================================================
+   Red File Editor - Obsidian Plugin Styles
+   ========================================================================== */
+
+/* Container */
+.dev-file-editor-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    background-color: var(--background-primary);
+    color: var(--text-normal);
+    box-sizing: border-box;
+}
+
+/* Header */
+.dev-file-editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background-color: var(--background-secondary);
+    border-bottom: 1px solid var(--background-modifier-border);
+    flex-shrink: 0;
+    gap: 8px;
+    font-size: var(--font-ui-small);
+}
+
+.dev-file-editor-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dev-file-editor-icon {
+    display: flex;
+    align-items: center;
+    color: var(--text-accent);
+}
+
+.dev-file-editor-filename {
+    font-weight: var(--font-semibold);
+    color: var(--text-normal);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dev-file-editor-lang {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background-color: var(--background-modifier-border);
+    color: var(--text-muted);
+}
+
+/* Editor Body */
+.dev-code-editor {
+    display: flex;
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background-color: var(--background-primary);
+    font-family: var(--font-monospace);
+    font-size: var(--font-text-size);
+    line-height: 1.5;
+}
+
+/* Line Numbers */
+.dev-code-line-numbers {
+    flex-shrink: 0;
+    margin: 0;
+    padding: 12px 10px 12px 14px;
+    text-align: right;
+    user-select: none;
+    -webkit-user-select: none;
+    color: var(--text-faint);
+    background-color: var(--background-primary-alt);
+    border-right: 1px solid var(--background-modifier-border);
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    white-space: pre;
+    box-sizing: border-box;
+    min-width: 44px;
+}
+
+/* Viewport */
+.dev-code-viewport {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    height: 100%;
+}
+
+/* Syntax Highlight Overlay Layer */
+.dev-code-highlight {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    margin: 0;
+    padding: 12px 16px;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    tab-size: 4;
+    white-space: pre;
+    pointer-events: none;
+    box-sizing: border-box;
+    overflow: hidden;
+    color: var(--text-normal);
+}
+
+/* Input Textarea */
+.dev-code-input,
+.dev-code-input:hover,
+.dev-code-input:focus,
+.dev-code-input:active,
+textarea.dev-code-input:hover,
+textarea.dev-code-input:focus,
+textarea.dev-code-input:active {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 12px 16px;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    tab-size: 4;
+    white-space: pre;
+    box-sizing: border-box;
+    background: transparent !important;
+    background-color: transparent !important;
+    color: transparent !important;
+    -webkit-text-fill-color: transparent !important;
+    caret-color: var(--text-normal) !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    resize: none;
+    overflow: auto;
+}
+
+.dev-code-input::selection,
+textarea.dev-code-input::selection {
+    background-color: var(--text-selection) !important;
+    -webkit-text-fill-color: var(--text-normal) !important;
+    color: var(--text-normal) !important;
+}
+
+/* Status Bar */
+.dev-file-editor-statusbar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 4px 14px;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    background-color: var(--background-secondary);
+    border-top: 1px solid var(--background-modifier-border);
+    flex-shrink: 0;
+}
+
+.dev-file-editor-status {
+    user-select: none;
+}
+
+/* Syntax Highlighting Tokens */
+.tok-comment {
+    color: var(--text-faint);
+    font-style: italic;
+}
+
+.tok-keyword {
+    color: var(--text-accent);
+    font-weight: 600;
+}
+
+.tok-string {
+    color: #98c379;
+}
+
+.theme-light .tok-string {
+    color: #50a14f;
+}
+
+.tok-number {
+    color: #d19a66;
+}
+
+.theme-light .tok-number {
+    color: #986801;
+}
+
+.tok-boolean {
+    color: #e5c07b;
+}
+
+.theme-light .tok-boolean {
+    color: #c18401;
+}
+
+.tok-variable {
+    color: #e06c75;
+}
+
+.theme-light .tok-variable {
+    color: #e45649;
+}
+
+.tok-key {
+    color: #61afef;
+}
+
+.theme-light .tok-key {
+    color: #4078f2;
+}
+
+.tok-section {
+    color: #c678dd;
+    font-weight: bold;
+}
+
+.theme-light .tok-section {
+    color: #a626a4;
+}
+
+.tok-punctuation {
+    color: var(--text-muted);
+}
+
+/* File Explorer Badges */
+.dev-file-explorer-badge {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    background-color: var(--background-modifier-border);
+    color: var(--text-muted);
+    padding: 1px 5px;
+    border-radius: 3px;
+    margin-left: 6px;
+    display: inline-block;
+    vertical-align: middle;
+    line-height: 1.2;
+    pointer-events: none;
+}
+
+/* Hidden Dotfiles in File Explorer */
+.dev-hidden-dotfile {
+    opacity: 0.9;
+}
+
+.dev-hidden-dotfile:hover {
+    opacity: 1;
+}
+
+/* Header Actions & Copy Button */
+.dev-file-editor-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow: hidden;
+}
+
+.dev-file-editor-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.dev-file-copy-btn {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: var(--radius-s);
+    background-color: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    line-height: 1.2;
+}
+
+.dev-file-copy-btn:hover {
+    background-color: var(--background-modifier-hover);
+    color: var(--text-normal);
+    border-color: var(--interactive-accent);
+}
+
+/* Status Bar & Save Status Indicator */
+.dev-file-editor-statusbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 12px;
+    background-color: var(--background-secondary);
+    border-top: 1px solid var(--background-modifier-border);
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.dev-file-editor-save-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+}
+
+.dev-save-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.dev-save-dot.mod-saved {
+    background-color: var(--color-green, #48c774);
+}
+
+.dev-save-dot.mod-saving {
+    background-color: var(--color-yellow, #ffdd57);
+    animation: dev-save-pulse 1s infinite alternate;
+}
+
+.dev-save-dot.mod-error {
+    background-color: var(--color-red, #f14668);
+}
+
+@keyframes dev-save-pulse {
+    from { opacity: 0.4; }
+    to { opacity: 1; }
+}
+
+/* Settings Tab : Extensions List */
+.dev-extensions-list-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 0 16px 0;
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.dev-extension-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background-color: var(--background-secondary-alt);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    padding: 2px 8px;
+    font-size: 12px;
+    font-family: var(--font-monospace);
+    color: var(--text-normal);
+}
+
+.dev-extension-tag-remove {
+    cursor: pointer;
+    font-weight: bold;
+    color: var(--text-faint);
+    margin-left: 2px;
+    padding: 0 2px;
+    border-radius: 3px;
+    line-height: 1;
+}
+
+.dev-extension-tag-remove:hover {
+    color: var(--color-red, #f14668);
+    background-color: var(--background-modifier-hover);
+}
+

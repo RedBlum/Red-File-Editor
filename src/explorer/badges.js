@@ -9,8 +9,42 @@ const badgeMethods = {
 
         const observer =
             new MutationObserver(
-                () => {
-                    this.scheduleExplorerBadgeUpdate();
+                mutations => {
+                    if (this.badgeUpdateRunning) {
+                        return;
+                    }
+
+                    let relevant = false;
+                    for (const m of mutations) {
+                        if (
+                            m.target &&
+                            m.target.classList &&
+                            m.target.classList.contains("dev-file-explorer-badge")
+                        ) {
+                            continue;
+                        }
+
+                        const allNodes = Array.from(m.addedNodes || []).concat(Array.from(m.removedNodes || []));
+                        const hasOnlyBadges = allNodes.length > 0 && allNodes.every(
+                            node => node.nodeType === 1 && node.classList.contains("dev-file-explorer-badge")
+                        );
+                        if (hasOnlyBadges) {
+                            continue;
+                        }
+
+                        if (
+                            m.target &&
+                            m.target.closest &&
+                            m.target.closest('.workspace-leaf-content[data-type="file-explorer"]')
+                        ) {
+                            relevant = true;
+                            break;
+                        }
+                    }
+
+                    if (relevant) {
+                        this.scheduleExplorerBadgeUpdate();
+                    }
                 }
             );
 
@@ -68,78 +102,89 @@ const badgeMethods = {
 
 
     updateFileExplorerBadges() {
-        const titles =
-            document.querySelectorAll(
-                ".nav-file-title"
-            );
+        if (this.badgeUpdateRunning) {
+            return;
+        }
 
-        titles.forEach(
-            title => {
-                const oldBadge =
-                    title.querySelector(
-                        ".dev-file-explorer-badge"
-                    );
+        this.badgeUpdateRunning = true;
 
-                const path =
-                    title.getAttribute(
-                        "data-path"
-                    );
+        try {
+            const titles =
+                document.querySelectorAll(
+                    ".nav-file-title"
+                );
 
-                if (!path) {
-                    return;
-                }
-
-                const file =
-                    this.app.vault
-                        .getAbstractFileByPath(
-                            path
+            titles.forEach(
+                title => {
+                    const oldBadge =
+                        title.querySelector(
+                            ".dev-file-explorer-badge"
                         );
 
-                if (
-                    !(file instanceof TFile)
-                ) {
-                    return;
-                }
+                    const path =
+                        title.getAttribute(
+                            "data-path"
+                        );
 
-                /*
-                 * On ajoute nos propres badges uniquement
-                 * aux vrais dotfiles. Obsidian garde ses
-                 * badges natifs pour YAML, JSON, etc.
-                 */
-                if (!isDotFile(file)) {
-                    return;
-                }
-
-                const label =
-                    getTypeLabelFromFile(file);
-
-                if (!label) {
-                    return;
-                }
-
-                if (oldBadge) {
-                    if (oldBadge.textContent !== label) {
-                        oldBadge.textContent = label;
+                    if (!path) {
+                        return;
                     }
-                    return;
-                }
 
-                const badge =
-                    document.createElement(
-                        "span"
+                    const file =
+                        this.app.vault
+                            .getAbstractFileByPath(
+                                path
+                            );
+
+                    if (
+                        !(file instanceof TFile)
+                    ) {
+                        return;
+                    }
+
+                    /*
+                     * On ajoute nos propres badges uniquement
+                     * aux vrais dotfiles. Obsidian garde ses
+                     * badges natifs pour YAML, JSON, etc.
+                     */
+                    if (!isDotFile(file)) {
+                        return;
+                    }
+
+                    const label =
+                        getTypeLabelFromFile(file);
+
+                    if (!label) {
+                        return;
+                    }
+
+                    if (oldBadge) {
+                        if (oldBadge.textContent !== label) {
+                            oldBadge.textContent = label;
+                        }
+                        return;
+                    }
+
+                    const badge =
+                        document.createElement(
+                            "span"
+                        );
+
+                    badge.className =
+                        "dev-file-explorer-badge";
+
+                    badge.textContent =
+                        label;
+
+                    title.appendChild(
+                        badge
                     );
-
-                badge.className =
-                    "dev-file-explorer-badge";
-
-                badge.textContent =
-                    label;
-
-                title.appendChild(
-                    badge
-                );
-            }
-        );
+                }
+            );
+        }
+        finally {
+            this.badgeUpdateRunning = false;
+        }
     },
 };
 

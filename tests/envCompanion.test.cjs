@@ -181,6 +181,43 @@ for (const [label, PluginClass] of variants) {
         f.workspace.setActiveLeaf(b); await f.settle(); assert.equal(f.workspace.splits.length, 2);
     });
 
+    test(`${label} : clics répétés dans l'éditeur YAML ne dupliquent pas le panneau .env`, async t => {
+        const f = fixture(PluginClass); t.after(f.cleanup);
+        f.files.set('.env', 'A=1'); const yaml = f.addLeaf('compose.yaml');
+        f.workspace.activeLeaf = yaml; await start(f);
+        const env = f.plugin.envCompanion.leaf;
+        assert.equal(f.workspace.splits.length, 1);
+        // Simuler 50 clics dans l'éditeur YAML
+        for (let i = 0; i < 50; i++) {
+            f.workspace.setActiveLeaf(yaml);
+            await f.settle();
+        }
+        assert.equal(f.workspace.splits.length, 1);
+        assert.equal(f.plugin.envCompanion.leaf, env);
+    });
+
+    test(`${label} : fermeture manuelle respectée malgré clics répétés dans le YAML`, async t => {
+        const f = fixture(PluginClass); t.after(f.cleanup);
+        f.files.set('.env', 'A=1'); const a = f.addLeaf('a.yaml'); const b = f.addLeaf('b.yaml');
+        f.workspace.activeLeaf = a; await start(f);
+        assert.equal(f.workspace.splits.length, 1);
+        // Fermeture manuelle de .env
+        f.plugin.envCompanion.leaf.detach(); await f.settle();
+        assert.equal(f.plugin.envCompanion.leaf, null);
+        assert.equal(f.workspace.splits.length, 1);
+        // Clics répétés dans a.yaml ne doivent pas ré-ouvrir .env
+        for (let i = 0; i < 20; i++) {
+            f.workspace.setActiveLeaf(a);
+            await f.settle();
+        }
+        assert.equal(f.plugin.envCompanion.leaf, null);
+        assert.equal(f.workspace.splits.length, 1);
+        // Changer de fichier YAML ré-active l'ouverture automatique
+        f.workspace.setActiveLeaf(b); await f.settle();
+        assert.equal(f.workspace.splits.length, 2);
+        assert.notEqual(f.plugin.envCompanion.leaf, null);
+    });
+
     test(`${label} : réglage désactivé ferme le panneau et bloque son ouverture`, async t => {
         const f = fixture(PluginClass); t.after(f.cleanup);
         f.files.set('.env', 'A=1'); const yaml = f.addLeaf('compose.yaml');

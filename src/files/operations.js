@@ -80,7 +80,7 @@ const fileOperationMethods = {
     },
 
 
-    async createFile(filename) {
+    async createFile(filename, targetFolder = null) {
         filename =
             filename.trim();
 
@@ -96,19 +96,21 @@ const fileOperationMethods = {
             filename += ".md";
         }
 
-        let folder = "";
+        let folder = targetFolder || "";
 
-        const activeFile =
-            this.app.workspace
-                .getActiveFile();
+        if (!folder) {
+            const activeFile =
+                this.app.workspace
+                    .getActiveFile();
 
-        if (
-            activeFile &&
-            activeFile.parent &&
-            activeFile.parent.path !== "/"
-        ) {
-            folder =
-                activeFile.parent.path;
+            if (
+                activeFile &&
+                activeFile.parent &&
+                activeFile.parent.path !== "/"
+            ) {
+                folder =
+                    activeFile.parent.path;
+            }
         }
 
         const path =
@@ -151,8 +153,22 @@ const fileOperationMethods = {
                         ""
                     );
 
+            const extension =
+                this.getExtension(
+                    file.name
+                );
+
+            const handledByPlugin =
+                isDotFile(file) ||
+                (
+                    extension &&
+                    extension !== "md" &&
+                    this.settings.extensions
+                        .includes(extension)
+                );
+
             if (
-                isDotFile(file)
+                handledByPlugin
             ) {
                 await this
                     .openInDevEditor(
@@ -161,11 +177,14 @@ const fileOperationMethods = {
             }
 
             else {
-                await this.app.workspace
-                    .getLeaf(false)
-                    .openFile(
-                        file
-                    );
+                const leaf =
+                    typeof this.app.workspace.getLeaf === "function"
+                        ? this.app.workspace.getLeaf(false)
+                        : null;
+
+                if (leaf && typeof leaf.openFile === "function") {
+                    await leaf.openFile(file);
+                }
             }
 
             this.scheduleExplorerBadgeUpdate();

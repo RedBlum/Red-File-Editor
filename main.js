@@ -1,4 +1,3 @@
-/* Fichier généré. Modifier src/ puis lancer npm run build. */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
   try {
@@ -433,6 +432,8 @@ var require_DevFileView = __commonJS({
         this.filenameEl = null;
         this.languageEl = null;
         this.statusEl = null;
+        this.saveStatusEl = null;
+        this.copyButtonEl = null;
         this.file = null;
         this.filePath = "";
         this.saveTimer = null;
@@ -449,16 +450,27 @@ var require_DevFileView = __commonJS({
       }
       getState() {
         return {
-          file: this.filePath
+          file: this.filePath,
+          autoEnvCompanion: this.autoEnvCompanion,
+          envSourcePath: this.envSourcePath
         };
       }
       async setState(state) {
-        this.filePath = state && typeof state.file === "string" ? state.file : "";
+        this.autoEnvCompanion = Boolean(state?.autoEnvCompanion);
+        this.envSourcePath = state?.envSourcePath || null;
+        if (this.autoEnvCompanion) {
+          this.navigation = false;
+        }
+        const newPath = state && typeof state.file === "string" ? state.file : "";
+        const pathChanged = newPath !== this.filePath;
+        this.filePath = newPath;
         this.file = this.filePath ? this.app.vault.getAbstractFileByPath(this.filePath) : null;
         if (!(this.file instanceof TFile2)) {
           this.file = null;
         }
-        await this.loadCurrentPath();
+        if (pathChanged) {
+          await this.loadCurrentPath();
+        }
       }
       async loadCurrentPath() {
         if (!this.filePath || !this.editor || this.loadingPath) {
@@ -486,6 +498,7 @@ var require_DevFileView = __commonJS({
         }
       }
       requestSave() {
+        this.setSaveStatus("saving");
         if (this.saveTimer) {
           clearTimeout(this.saveTimer);
         }
@@ -497,6 +510,10 @@ var require_DevFileView = __commonJS({
         );
       }
       async saveNow() {
+        if (this.saveTimer) {
+          clearTimeout(this.saveTimer);
+          this.saveTimer = null;
+        }
         if (!this.filePath || !this.editor || this.loadingPath) {
           return;
         }
@@ -505,12 +522,14 @@ var require_DevFileView = __commonJS({
             this.filePath,
             this.editor.value
           );
+          this.setSaveStatus("saved");
         } catch (error) {
           console.error(
             "[Dev File Editor] Impossible d'\xE9crire",
             this.filePath,
             error
           );
+          this.setSaveStatus("error");
           new Notice2(
             `Impossible d'enregistrer : ${this.filePath}`
           );
@@ -534,12 +553,46 @@ var require_DevFileView = __commonJS({
         const header = this.contentEl.createDiv({
           cls: "dev-file-editor-header"
         });
-        this.filenameEl = header.createDiv({
+        const headerLeft = header.createDiv({
+          cls: "dev-file-editor-header-left"
+        });
+        this.filenameEl = headerLeft.createDiv({
           cls: "dev-file-editor-filename"
         });
-        this.languageEl = header.createDiv({
+        this.languageEl = headerLeft.createDiv({
           cls: "dev-file-editor-language"
         });
+        const headerActions = header.createDiv({
+          cls: "dev-file-editor-header-actions"
+        });
+        this.copyButtonEl = headerActions.createEl("button", {
+          cls: "dev-file-copy-btn",
+          text: "Copier"
+        });
+        this.copyButtonEl.setAttribute(
+          "title",
+          "Copier tout le contenu"
+        );
+        this.copyButtonEl.addEventListener(
+          "click",
+          async () => {
+            if (!this.editor) return;
+            try {
+              if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+                await navigator.clipboard.writeText(this.editor.value);
+              }
+              this.copyButtonEl.setText("Copi\xE9 !");
+              new Notice2("Contenu copi\xE9 dans le presse-papiers.");
+              setTimeout(() => {
+                if (this.copyButtonEl) {
+                  this.copyButtonEl.setText("Copier");
+                }
+              }, 1500);
+            } catch (e) {
+              new Notice2("Impossible de copier le contenu.");
+            }
+          }
+        );
         const body = this.contentEl.createDiv({
           cls: "dev-code-editor"
         });
@@ -578,6 +631,10 @@ var require_DevFileView = __commonJS({
         this.statusEl = footer.createDiv({
           cls: "dev-file-editor-status"
         });
+        this.saveStatusEl = footer.createDiv({
+          cls: "dev-file-editor-save-status"
+        });
+        this.setSaveStatus("saved");
         this.editor.addEventListener(
           "input",
           () => {
@@ -702,8 +759,15 @@ var require_DevFileView = __commonJS({
           `Ln ${line}, Col ${column}  \u2022  ${totalLines} ligne${totalLines > 1 ? "s" : ""}`
         );
       }
-      handleKeyDown(event) {
+      async handleKeyDown(event) {
         if (!this.editor) {
+          return;
+        }
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+          event.preventDefault();
+          await this.saveNow();
+          const name = this.filePath.split("/").pop() || this.filePath;
+          new Notice2(`Enregistr\xE9 : ${name}`);
           return;
         }
         if (event.key === "Tab") {
@@ -813,6 +877,25 @@ ${indentation}`
           "select"
         );
       }
+      setSaveStatus(status) {
+        if (!this.saveStatusEl) {
+          return;
+        }
+        this.saveStatusEl.empty();
+        this.saveStatusEl.createSpan({
+          cls: `dev-save-dot mod-${status}`
+        });
+        const label = this.saveStatusEl.createSpan({
+          cls: "dev-save-label"
+        });
+        if (status === "saving") {
+          label.setText("Enregistrement...");
+        } else if (status === "saved") {
+          label.setText("Enregistr\xE9");
+        } else if (status === "error") {
+          label.setText("Erreur");
+        }
+      }
     };
     module2.exports = { DevFileView: DevFileView2 };
   }
@@ -823,9 +906,10 @@ var require_CreateFileModal = __commonJS({
   "src/modals/CreateFileModal.js"(exports2, module2) {
     var { Modal, Setting, Notice: Notice2 } = require("obsidian");
     var CreateFileModal2 = class extends Modal {
-      constructor(app, plugin) {
+      constructor(app, plugin, targetFolder = null) {
         super(app);
         this.plugin = plugin;
+        this.targetFolder = targetFolder;
         this.filename = "";
       }
       onOpen() {
@@ -836,6 +920,12 @@ var require_CreateFileModal = __commonJS({
         contentEl.createEl("p", {
           text: "Sans extension \u2192 .md | Avec extension \u2192 extension conserv\xE9e"
         });
+        if (this.targetFolder) {
+          contentEl.createEl("p", {
+            cls: "setting-item-description",
+            text: `Dossier cible : ${this.targetFolder}/`
+          });
+        }
         new Setting(contentEl).setName("Nom du fichier").setDesc("Exemples : Note serveur, .env, docker-compose.yml, nginx.conf").addText((text) => {
           text.setPlaceholder("docker-compose.yml").onChange((value) => {
             this.filename = value.trim();
@@ -866,7 +956,7 @@ var require_CreateFileModal = __commonJS({
           return;
         }
         this.close();
-        await this.plugin.createFile(this.filename);
+        await this.plugin.createFile(this.filename, this.targetFolder);
       }
       onClose() {
         this.contentEl.empty();
@@ -933,7 +1023,8 @@ var require_ChangeExtensionModal = __commonJS({
 // src/settings/DevFileEditorSettingTab.js
 var require_DevFileEditorSettingTab = __commonJS({
   "src/settings/DevFileEditorSettingTab.js"(exports2, module2) {
-    var { PluginSettingTab, Setting } = require("obsidian");
+    var { PluginSettingTab, Setting, Notice: Notice2 } = require("obsidian");
+    var { DEFAULT_EXTENSIONS: DEFAULT_EXTENSIONS2 } = require_constants();
     var DevFileEditorSettingTab2 = class extends PluginSettingTab {
       constructor(app, plugin) {
         super(app, plugin);
@@ -942,28 +1033,23 @@ var require_DevFileEditorSettingTab = __commonJS({
       display() {
         const { containerEl } = this;
         containerEl.empty();
-        containerEl.createEl(
-          "h2",
-          {
-            text: "Red File Editor"
-          }
-        );
+        containerEl.createEl("h2", {
+          text: "Red File Editor"
+        });
+        containerEl.createEl("h3", {
+          text: "\xC9diteur de code"
+        });
         new Setting(containerEl).setName("Largeur de l'\xE9diteur").setDesc(
-          "R\xE8gle la largeur du bloc d'\xE9dition. La modification est appliqu\xE9e imm\xE9diatement."
+          "R\xE8gle la largeur du bloc d'\xE9dition (50% \xE0 100%). La modification est appliqu\xE9e imm\xE9diatement."
         ).addSlider((slider) => {
-          slider.setLimits(
-            50,
-            100,
-            1
-          ).setValue(
-            this.plugin.getEditorWidthPercent()
-          ).setDynamicTooltip().onChange(
-            async (value) => {
-              this.plugin.settings.editorWidthPercent = value;
-              this.plugin.applyEditorWidth();
-              await this.plugin.saveSettings();
+          slider.setLimits(50, 100, 1).setValue(this.plugin.getEditorWidthPercent()).setDynamicTooltip().onChange(async (value) => {
+            this.plugin.settings.editorWidthPercent = value;
+            this.plugin.applyEditorWidth();
+            await this.plugin.saveSettings();
+            if (widthInfo) {
+              widthInfo.setText(`Largeur actuelle : ${value} %`);
             }
-          );
+          });
         });
         const widthInfo = containerEl.createDiv({
           cls: "dev-file-editor-setting-info"
@@ -971,6 +1057,101 @@ var require_DevFileEditorSettingTab = __commonJS({
         widthInfo.setText(
           `Largeur actuelle : ${this.plugin.getEditorWidthPercent()} %`
         );
+        containerEl.createEl("h3", {
+          text: "Compagnon .env"
+        });
+        new Setting(containerEl).setName("Ouvrir automatiquement le .env avec les fichiers YAML").setDesc(
+          "Affiche automatiquement le fichier .env du m\xEAme dossier dans un panneau vertical \xE0 droite lors de l'ouverture d'un fichier .yaml ou .yml."
+        ).addToggle((toggle) => {
+          toggle.setValue(this.plugin.settings.autoOpenEnvWithYaml !== false).onChange(async (value) => {
+            this.plugin.settings.autoOpenEnvWithYaml = value;
+            await this.plugin.saveSettings();
+            if (this.plugin.envCompanion) {
+              this.plugin.envCompanion.schedule();
+            }
+          });
+        });
+        containerEl.createEl("h3", {
+          text: "Extensions de fichiers prises en charge"
+        });
+        const extensionsDesc = containerEl.createEl("p", {
+          cls: "setting-item-description"
+        });
+        extensionsDesc.setText(
+          "Les fichiers dotfiles (.env, .gitignore, etc.) sont toujours pris en charge. Les extensions ci-dessous sont \xE9dit\xE9es dans l'\xE9diteur de code sans ajouter le suffixe .md."
+        );
+        let newExtInput = "";
+        new Setting(containerEl).setName("Ajouter une extension").setDesc("Saisissez une extension sans point (ex: env.local, prisma, proto)").addText((text) => {
+          text.setPlaceholder("ex: prisma").onChange((val) => {
+            newExtInput = val.trim().toLowerCase().replace(/^\./, "");
+          });
+          text.inputEl.addEventListener("keydown", async (event) => {
+            if (event.key === "Enter" && newExtInput) {
+              event.preventDefault();
+              await this.addExtension(newExtInput);
+            }
+          });
+        }).addButton((btn) => {
+          btn.setButtonText("Ajouter").setCta().onClick(async () => {
+            if (newExtInput) {
+              await this.addExtension(newExtInput);
+            } else {
+              new Notice2("Veuillez saisir une extension valide.");
+            }
+          });
+        });
+        const badgesContainer = containerEl.createDiv({
+          cls: "dev-extensions-list-container"
+        });
+        const currentExtensions = Array.isArray(this.plugin.settings.extensions) ? this.plugin.settings.extensions : [...DEFAULT_EXTENSIONS2];
+        for (const ext of currentExtensions) {
+          const badge = badgesContainer.createDiv({
+            cls: "dev-extension-tag"
+          });
+          badge.createSpan({ text: `.${ext}` });
+          const removeBtn = badge.createSpan({
+            cls: "dev-extension-tag-remove",
+            text: "\xD7"
+          });
+          removeBtn.setAttribute("title", `Supprimer .${ext}`);
+          removeBtn.addEventListener("click", async () => {
+            this.plugin.settings.extensions = this.plugin.settings.extensions.filter(
+              (e) => e !== ext
+            );
+            await this.plugin.saveSettings();
+            this.display();
+            new Notice2(`Extension retir\xE9e : .${ext}`);
+          });
+        }
+        new Setting(containerEl).setName("R\xE9initialiser les extensions par d\xE9faut").setDesc("R\xE9tablit la liste d'origine des extensions support\xE9es.").addButton((btn) => {
+          btn.setButtonText("R\xE9initialiser").setWarning().onClick(async () => {
+            this.plugin.settings.extensions = [...DEFAULT_EXTENSIONS2];
+            await this.plugin.saveSettings();
+            if (typeof this.plugin.registerSupportedExtensions === "function") {
+              this.plugin.registerSupportedExtensions();
+            }
+            this.display();
+            new Notice2("Extensions r\xE9initialis\xE9es aux valeurs par d\xE9faut.");
+          });
+        });
+      }
+      async addExtension(ext) {
+        if (!ext || ext === "md") {
+          new Notice2("Extension invalide ou non support\xE9e.");
+          return;
+        }
+        if (this.plugin.settings.extensions.includes(ext)) {
+          new Notice2(`L'extension .${ext} est d\xE9j\xE0 enregistr\xE9e.`);
+          return;
+        }
+        if (typeof this.plugin.addExtension === "function") {
+          await this.plugin.addExtension(ext);
+        } else {
+          this.plugin.settings.extensions.push(ext);
+          await this.plugin.saveSettings();
+        }
+        this.display();
+        new Notice2(`Extension ajout\xE9e : .${ext}`);
       }
     };
     module2.exports = { DevFileEditorSettingTab: DevFileEditorSettingTab2 };
@@ -1157,8 +1338,30 @@ var require_badges = __commonJS({
       installFileExplorerBadges() {
         this.scheduleExplorerBadgeUpdate();
         const observer = new MutationObserver(
-          () => {
-            this.scheduleExplorerBadgeUpdate();
+          (mutations) => {
+            if (this.badgeUpdateRunning) {
+              return;
+            }
+            let relevant = false;
+            for (const m of mutations) {
+              if (m.target && m.target.classList && m.target.classList.contains("dev-file-explorer-badge")) {
+                continue;
+              }
+              const allNodes = Array.from(m.addedNodes || []).concat(Array.from(m.removedNodes || []));
+              const hasOnlyBadges = allNodes.length > 0 && allNodes.every(
+                (node) => node.nodeType === 1 && node.classList.contains("dev-file-explorer-badge")
+              );
+              if (hasOnlyBadges) {
+                continue;
+              }
+              if (m.target && m.target.closest && m.target.closest('.workspace-leaf-content[data-type="file-explorer"]')) {
+                relevant = true;
+                break;
+              }
+            }
+            if (relevant) {
+              this.scheduleExplorerBadgeUpdate();
+            }
           }
         );
         observer.observe(
@@ -1204,49 +1407,57 @@ var require_badges = __commonJS({
         );
       },
       updateFileExplorerBadges() {
-        const titles = document.querySelectorAll(
-          ".nav-file-title"
-        );
-        titles.forEach(
-          (title) => {
-            const oldBadge = title.querySelector(
-              ".dev-file-explorer-badge"
-            );
-            const path = title.getAttribute(
-              "data-path"
-            );
-            if (!path) {
-              return;
-            }
-            const file = this.app.vault.getAbstractFileByPath(
-              path
-            );
-            if (!(file instanceof TFile2)) {
-              return;
-            }
-            if (!isDotFile2(file)) {
-              return;
-            }
-            const label = getTypeLabelFromFile(file);
-            if (!label) {
-              return;
-            }
-            if (oldBadge) {
-              if (oldBadge.textContent !== label) {
-                oldBadge.textContent = label;
+        if (this.badgeUpdateRunning) {
+          return;
+        }
+        this.badgeUpdateRunning = true;
+        try {
+          const titles = document.querySelectorAll(
+            ".nav-file-title"
+          );
+          titles.forEach(
+            (title) => {
+              const oldBadge = title.querySelector(
+                ".dev-file-explorer-badge"
+              );
+              const path = title.getAttribute(
+                "data-path"
+              );
+              if (!path) {
+                return;
               }
-              return;
+              const file = this.app.vault.getAbstractFileByPath(
+                path
+              );
+              if (!(file instanceof TFile2)) {
+                return;
+              }
+              if (!isDotFile2(file)) {
+                return;
+              }
+              const label = getTypeLabelFromFile(file);
+              if (!label) {
+                return;
+              }
+              if (oldBadge) {
+                if (oldBadge.textContent !== label) {
+                  oldBadge.textContent = label;
+                }
+                return;
+              }
+              const badge = document.createElement(
+                "span"
+              );
+              badge.className = "dev-file-explorer-badge";
+              badge.textContent = label;
+              title.appendChild(
+                badge
+              );
             }
-            const badge = document.createElement(
-              "span"
-            );
-            badge.className = "dev-file-explorer-badge";
-            badge.textContent = label;
-            title.appendChild(
-              badge
-            );
-          }
-        );
+          );
+        } finally {
+          this.badgeUpdateRunning = false;
+        }
       }
     };
     module2.exports = { badgeMethods: badgeMethods2 };
@@ -1261,8 +1472,30 @@ var require_dotfiles = __commonJS({
       installHiddenDotFilesExplorer() {
         this.scheduleHiddenDotFilesUpdate();
         const observer = new MutationObserver(
-          () => {
-            this.scheduleHiddenDotFilesUpdate();
+          (mutations) => {
+            if (this.hiddenFilesUpdateRunning) {
+              return;
+            }
+            let relevant = false;
+            for (const m of mutations) {
+              if (m.target && m.target.classList && (m.target.classList.contains("dev-hidden-dotfile") || m.target.classList.contains("dev-hidden-dotfile-title") || m.target.classList.contains("dev-file-explorer-badge"))) {
+                continue;
+              }
+              const allNodes = Array.from(m.addedNodes || []).concat(Array.from(m.removedNodes || []));
+              const hasSelfElements = allNodes.some(
+                (node) => node.nodeType === 1 && (node.classList.contains("dev-hidden-dotfile") || node.classList.contains("dev-file-explorer-badge"))
+              );
+              if (hasSelfElements) {
+                continue;
+              }
+              if (m.target && m.target.closest && m.target.closest('.workspace-leaf-content[data-type="file-explorer"]')) {
+                relevant = true;
+                break;
+              }
+            }
+            if (relevant) {
+              this.scheduleHiddenDotFilesUpdate();
+            }
           }
         );
         observer.observe(
@@ -1291,6 +1524,10 @@ var require_dotfiles = __commonJS({
         }
       },
       scheduleHiddenDotFilesUpdate() {
+        if (this.hiddenFilesUpdateRunning) {
+          this.hiddenFilesNeedsRerun = true;
+          return;
+        }
         if (this.hiddenFilesUpdateTimer) {
           clearTimeout(
             this.hiddenFilesUpdateTimer
@@ -1317,9 +1554,14 @@ var require_dotfiles = __commonJS({
               ".nav-files-container"
             );
             if (rootContainer) {
+              const modRoot = rootContainer.querySelector(
+                ":scope > .nav-folder.mod-root > .nav-folder-children"
+              ) || rootContainer.querySelector(
+                ":scope > .tree-item.nav-folder > .tree-item-children"
+              );
               await this.syncHiddenFilesForFolder(
                 "",
-                rootContainer
+                modRoot || rootContainer
               );
             }
             const folderTitles = explorer.querySelectorAll(
@@ -1359,6 +1601,10 @@ var require_dotfiles = __commonJS({
           );
         } finally {
           this.hiddenFilesUpdateRunning = false;
+          if (this.hiddenFilesNeedsRerun) {
+            this.hiddenFilesNeedsRerun = false;
+            this.scheduleHiddenDotFilesUpdate();
+          }
         }
       },
       async syncHiddenFilesForFolder(folderPath, container) {
@@ -1403,6 +1649,22 @@ var require_dotfiles = __commonJS({
           if (alreadyNative) {
             continue;
           }
+          const name = path.split("/").pop() || path;
+          const isEnv = name === ".env" || name.startsWith(".env.");
+          let targetYamlFile = null;
+          if (isEnv) {
+            const targetYamlTitle = Array.from(
+              container.querySelectorAll(
+                ":scope > .nav-file > .nav-file-title[data-path], :scope > .tree-item > .tree-item-self[data-path]"
+              )
+            ).find((el) => {
+              const p = el.getAttribute("data-path") || "";
+              const fileFolder = p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : "";
+              return fileFolder === folderPath && /\.(yaml|yml)$/i.test(p);
+            });
+            const rawYamlFile = targetYamlTitle ? targetYamlTitle.closest(".nav-file") || targetYamlTitle.closest(".tree-item") : null;
+            targetYamlFile = rawYamlFile && rawYamlFile.parentElement === container ? rawYamlFile : null;
+          }
           const alreadySynthetic = Array.from(
             container.querySelectorAll(
               ":scope > .nav-file.dev-hidden-dotfile"
@@ -1413,9 +1675,14 @@ var require_dotfiles = __commonJS({
             ) === path
           );
           if (alreadySynthetic) {
+            if (isEnv && targetYamlFile && alreadySynthetic.previousSibling !== targetYamlFile) {
+              container.insertBefore(
+                alreadySynthetic,
+                targetYamlFile.nextSibling
+              );
+            }
             continue;
           }
-          const name = path.split("/").pop() || path;
           const nativeFile = Array.from(container.children).find(
             (child) => child.classList && child.classList.contains(
               "nav-file"
@@ -1550,7 +1817,12 @@ var require_dotfiles = __commonJS({
               "dev-hidden-dotfile"
             )
           );
-          if (firstNormalFile) {
+          if (isEnv && targetYamlFile) {
+            container.insertBefore(
+              fileEl,
+              targetYamlFile.nextSibling
+            );
+          } else if (firstNormalFile && firstNormalFile.parentElement === container) {
             container.insertBefore(
               fileEl,
               firstNormalFile
@@ -1618,7 +1890,7 @@ var require_operations = __commonJS({
           );
         }
       },
-      async createFile(filename) {
+      async createFile(filename, targetFolder = null) {
         filename = filename.trim();
         if (!filename) {
           return;
@@ -1628,10 +1900,12 @@ var require_operations = __commonJS({
         )) {
           filename += ".md";
         }
-        let folder = "";
-        const activeFile = this.app.workspace.getActiveFile();
-        if (activeFile && activeFile.parent && activeFile.parent.path !== "/") {
-          folder = activeFile.parent.path;
+        let folder = targetFolder || "";
+        if (!folder) {
+          const activeFile = this.app.workspace.getActiveFile();
+          if (activeFile && activeFile.parent && activeFile.parent.path !== "/") {
+            folder = activeFile.parent.path;
+          }
         }
         const path = folder ? `${folder}/${filename}` : filename;
         const existing = this.app.vault.getAbstractFileByPath(
@@ -1656,14 +1930,19 @@ var require_operations = __commonJS({
             path,
             ""
           );
-          if (isDotFile2(file)) {
+          const extension2 = this.getExtension(
+            file.name
+          );
+          const handledByPlugin = isDotFile2(file) || extension2 && extension2 !== "md" && this.settings.extensions.includes(extension2);
+          if (handledByPlugin) {
             await this.openInDevEditor(
               file
             );
           } else {
-            await this.app.workspace.getLeaf(false).openFile(
-              file
-            );
+            const leaf = typeof this.app.workspace.getLeaf === "function" ? this.app.workspace.getLeaf(false) : null;
+            if (leaf && typeof leaf.openFile === "function") {
+              await leaf.openFile(file);
+            }
           }
           this.scheduleExplorerBadgeUpdate();
           new Notice2(
@@ -1802,8 +2081,234 @@ var require_operations = __commonJS({
   }
 });
 
+// src/workspace/envCompanion.js
+var require_envCompanion = __commonJS({
+  "src/workspace/envCompanion.js"(exports2, module2) {
+    var { VIEW_TYPE_DEV_FILE: VIEW_TYPE_DEV_FILE2 } = require_constants();
+    var EnvCompanion2 = class {
+      constructor(plugin) {
+        this.plugin = plugin;
+        this.workspace = plugin.app.workspace;
+        this.leaf = null;
+        this.source = null;
+        this.currentSourcePath = null;
+        this.lastSourcePath = null;
+        this.manuallyClosed = /* @__PURE__ */ new Set();
+        this._programmaticClosing = false;
+        this.timer = null;
+        this.running = null;
+        this.dirty = false;
+        this.stopped = false;
+      }
+      leaves() {
+        const leaves = [];
+        this.workspace.iterateAllLeaves((leaf) => leaves.push(leaf));
+        return leaves;
+      }
+      isLeafAttached(leaf) {
+        if (!leaf) return false;
+        if (leaf.parent != null) return true;
+        return this.leaves().includes(leaf);
+      }
+      path(leaf) {
+        return leaf?.view?.file?.path || leaf?.view?.filePath || leaf?.getViewState()?.state?.file || "";
+      }
+      owns(leaf) {
+        if (!leaf) return false;
+        const type = leaf.getViewState()?.type || (typeof leaf.view?.getViewType === "function" ? leaf.view.getViewType() : null);
+        if (type && type !== VIEW_TYPE_DEV_FILE2 && type !== "empty") {
+          return false;
+        }
+        if (leaf.view && leaf.view.autoEnvCompanion === false) {
+          leaf._isEnvCompanion = false;
+          return false;
+        }
+        if (leaf._isEnvCompanion === true) return true;
+        if (leaf === this.leaf) return true;
+        if (leaf.view && (leaf.view.autoEnvCompanion === true || leaf.view._isEnvCompanion === true)) return true;
+        const state = leaf.getViewState();
+        return state?.type === VIEW_TYPE_DEV_FILE2 && state.state?.autoEnvCompanion === true;
+      }
+      target() {
+        const active = this.workspace.activeLeaf;
+        const source = active === this.leaf && this.owns(active) ? this.source : active;
+        if (!source || !this.isLeafAttached(source)) return null;
+        const path = this.path(source);
+        return /\.(yaml|yml|yam)$/i.test(path) ? { source, path } : null;
+      }
+      attachDetachInterceptor(leaf, sourcePath) {
+        if (!leaf || leaf._detachInterceptorAttached) return;
+        leaf._detachInterceptorAttached = true;
+        const originalDetach = leaf.detach;
+        leaf.detach = () => {
+          if (!this._programmaticClosing) {
+            const closingFor = sourcePath || this.currentSourcePath;
+            if (closingFor) {
+              this.manuallyClosed.add(closingFor);
+            }
+            if (this.leaf === leaf) {
+              this.leaf = null;
+            }
+          }
+          return originalDetach.call(leaf);
+        };
+      }
+      start() {
+        this.leaf = this.workspace.getLeavesOfType(VIEW_TYPE_DEV_FILE2).find((leaf) => this.owns(leaf)) || null;
+        if (this.leaf) {
+          this.leaf._isEnvCompanion = true;
+          const sourcePath = this.leaf.getViewState()?.state?.envSourcePath;
+          this.source = this.leaves().find((leaf) => leaf !== this.leaf && this.path(leaf) === sourcePath) || null;
+          this.currentSourcePath = sourcePath || null;
+          this.attachDetachInterceptor(this.leaf, sourcePath);
+        }
+        for (const name of ["active-leaf-change", "file-open", "layout-change"]) {
+          this.plugin.registerEvent(this.workspace.on(name, () => this.schedule()));
+        }
+        for (const name of ["create", "delete", "rename"]) {
+          this.plugin.registerEvent(this.plugin.app.vault.on(name, () => this.schedule()));
+        }
+        this.schedule();
+      }
+      schedule() {
+        if (this.stopped) return;
+        this.dirty = true;
+        if (this.running || this.timer) return;
+        this.timer = setTimeout(() => {
+          this.timer = null;
+          void this.run();
+        }, 30);
+      }
+      async run() {
+        if (this.running) return this.running;
+        if (this.timer) {
+          clearTimeout(this.timer);
+          this.timer = null;
+        }
+        this.running = this.drain();
+        try {
+          await this.running;
+        } finally {
+          this.running = null;
+          if (this.dirty && !this.stopped) this.schedule();
+        }
+      }
+      async drain() {
+        while (this.dirty && !this.stopped) {
+          this.dirty = false;
+          try {
+            await this.sync();
+          } catch (error) {
+            console.error("[Red File Editor] Suivi du .env :", error);
+            await this.close();
+          }
+        }
+      }
+      sameTarget(expected) {
+        const current = this.target();
+        return !this.stopped && this.plugin.settings.autoOpenEnvWithYaml !== false && current?.source === expected.source && current.path === expected.path;
+      }
+      async sync() {
+        if (this.leaf && !this.isLeafAttached(this.leaf)) {
+          const envSourcePath = this.currentSourcePath || this.leaf._envSourcePath || this.leaf.getViewState()?.state?.envSourcePath || this.path(this.source);
+          if (envSourcePath) {
+            this.manuallyClosed.add(envSourcePath);
+          }
+          this.leaf = null;
+          this.currentSourcePath = null;
+        } else if (this.leaf && !this.owns(this.leaf)) {
+          this.leaf = null;
+          this.currentSourcePath = null;
+        }
+        const target = this.target();
+        if (this.lastSourcePath && target && this.lastSourcePath !== target.path) {
+          this.manuallyClosed.delete(this.lastSourcePath);
+        }
+        this.lastSourcePath = target?.path || null;
+        if (this.plugin.settings.autoOpenEnvWithYaml === false || !target) {
+          await this.close();
+          this.source = null;
+          this.currentSourcePath = null;
+          return;
+        }
+        if (this.manuallyClosed.has(target.path)) {
+          return;
+        }
+        this.source = target.source;
+        const slash = target.path.lastIndexOf("/");
+        const envPath = slash < 0 ? ".env" : `${target.path.slice(0, slash)}/.env`;
+        const stat = await this.plugin.app.vault.adapter.stat(envPath);
+        if (!this.sameTarget(target)) {
+          this.dirty = !this.stopped;
+          return;
+        }
+        if (!stat || stat.type !== "file") {
+          await this.close();
+          return;
+        }
+        let leaf = this.leaf;
+        if (!leaf || !this.isLeafAttached(leaf)) {
+          leaf = this.leaves().find((l) => this.owns(l)) || null;
+          if (!leaf) {
+            leaf = this.workspace.createLeafBySplit(target.source, "vertical", false);
+          }
+          this.leaf = leaf;
+        }
+        leaf._isEnvCompanion = true;
+        leaf._envSourcePath = target.path;
+        this.attachDetachInterceptor(leaf, target.path);
+        const state = leaf.getViewState().state || {};
+        if (!this.owns(leaf) || state.file !== envPath || state.envSourcePath !== target.path) {
+          if (this.owns(leaf) && state.file && state.file !== envPath && typeof leaf.view?.saveNow === "function") {
+            await leaf.view.saveNow();
+          }
+          await leaf.setViewState({
+            type: VIEW_TYPE_DEV_FILE2,
+            active: false,
+            pinned: true,
+            state: { file: envPath, autoEnvCompanion: true, envSourcePath: target.path }
+          });
+          leaf._isEnvCompanion = true;
+          leaf._envSourcePath = target.path;
+          if (leaf.view) {
+            leaf.view._isEnvCompanion = true;
+            leaf.view.autoEnvCompanion = true;
+            leaf.view.envSourcePath = target.path;
+          }
+        }
+        this.currentSourcePath = target.path;
+        if (typeof leaf.loadIfDeferred === "function") await leaf.loadIfDeferred();
+        if (!this.sameTarget(target)) this.dirty = !this.stopped;
+      }
+      async close() {
+        const leaf = this.leaf;
+        this.leaf = null;
+        this.currentSourcePath = null;
+        if (!leaf || !this.isLeafAttached(leaf) || !this.owns(leaf)) return;
+        if (typeof leaf.view?.saveNow === "function") await leaf.view.saveNow();
+        if (this.isLeafAttached(leaf) && this.owns(leaf)) {
+          this._programmaticClosing = true;
+          try {
+            leaf.detach();
+          } finally {
+            this._programmaticClosing = false;
+          }
+        }
+      }
+      stop() {
+        this.stopped = true;
+        this.dirty = false;
+        if (this.timer) clearTimeout(this.timer);
+        this.timer = null;
+        void this.close().catch((error) => console.error("[Red File Editor] Fermeture du .env :", error));
+      }
+    };
+    module2.exports = { EnvCompanion: EnvCompanion2 };
+  }
+});
+
 // src/main.js
-var { Plugin, TFile, Notice } = require("obsidian");
+var { Plugin, TFile, TFolder, Notice } = require("obsidian");
 var { VIEW_TYPE_DEV_FILE, DEFAULT_EXTENSIONS } = require_constants();
 var { DevFileView } = require_DevFileView();
 var { CreateFileModal } = require_CreateFileModal();
@@ -1814,6 +2319,7 @@ var { openFileMethods } = require_openFiles();
 var { badgeMethods } = require_badges();
 var { dotfileMethods } = require_dotfiles();
 var { fileOperationMethods } = require_operations();
+var { EnvCompanion } = require_envCompanion();
 var DevFileEditorPlugin = class extends Plugin {
   async onload() {
     console.log("Loading Dev File Editor V2");
@@ -1847,69 +2353,82 @@ var DevFileEditorPlugin = class extends Plugin {
       (leaf) => new DevFileView(leaf)
     );
     this.registerSupportedExtensions();
+    this.envCompanion = new EnvCompanion(this);
     this.app.workspace.onLayoutReady(() => {
       this.installExistingFileClickInterceptor();
       this.installDotFileOpenHandler();
       this.installFileExplorerBadges();
       this.installHiddenDotFilesExplorer();
+      this.envCompanion.start();
     });
+    const handleNoteWithExplicitExtension = async (file) => {
+      if (!(file instanceof TFile)) {
+        return;
+      }
+      if (!file.name.toLowerCase().endsWith(".md")) {
+        this.scheduleExplorerBadgeUpdate();
+        return;
+      }
+      const rawBaseName = file.name.split("/").pop() || file.name;
+      const nameWithoutMd = rawBaseName.slice(0, -3);
+      if (!this.hasExplicitExtension(
+        nameWithoutMd
+      ) || nameWithoutMd.toLowerCase().endsWith(".md")) {
+        this.scheduleExplorerBadgeUpdate();
+        return;
+      }
+      const extension = this.getExtension(
+        nameWithoutMd
+      );
+      if (extension) {
+        await this.addExtension(
+          extension
+        );
+      }
+      const parentPath = file.parent && file.parent.path !== "/" && file.parent.path !== "" ? file.parent.path : "";
+      const newPath = parentPath ? `${parentPath}/${nameWithoutMd}` : nameWithoutMd;
+      const existing = this.app.vault.getAbstractFileByPath(
+        newPath
+      );
+      if (existing) {
+        new Notice(
+          `Le fichier existe d\xE9j\xE0 : ${newPath}`
+        );
+        return;
+      }
+      try {
+        if (this.app.fileManager && typeof this.app.fileManager.renameFile === "function") {
+          await this.app.fileManager.renameFile(
+            file,
+            newPath
+          );
+        }
+        const renamedFile = this.app.vault.getAbstractFileByPath(
+          newPath
+        );
+        if (renamedFile instanceof TFile) {
+          await this.openInDevEditor(
+            renamedFile
+          );
+        }
+        this.scheduleExplorerBadgeUpdate();
+      } catch (error) {
+        console.error(
+          "Dev File Editor:",
+          error
+        );
+      }
+    };
+    this.registerEvent(
+      this.app.vault.on(
+        "create",
+        handleNoteWithExplicitExtension
+      )
+    );
     this.registerEvent(
       this.app.vault.on(
         "rename",
-        async (file) => {
-          if (!(file instanceof TFile)) {
-            return;
-          }
-          if (!file.name.toLowerCase().endsWith(".md")) {
-            this.scheduleExplorerBadgeUpdate();
-            return;
-          }
-          const nameWithoutMd = file.name.slice(0, -3);
-          if (!this.hasExplicitExtension(
-            nameWithoutMd
-          )) {
-            this.scheduleExplorerBadgeUpdate();
-            return;
-          }
-          const extension = this.getExtension(
-            nameWithoutMd
-          );
-          if (extension) {
-            await this.addExtension(
-              extension
-            );
-          }
-          const newPath = file.parent && file.parent.path !== "/" ? `${file.parent.path}/${nameWithoutMd}` : nameWithoutMd;
-          const existing = this.app.vault.getAbstractFileByPath(
-            newPath
-          );
-          if (existing) {
-            new Notice(
-              `Le fichier existe d\xE9j\xE0 : ${newPath}`
-            );
-            return;
-          }
-          try {
-            await this.app.fileManager.renameFile(
-              file,
-              newPath
-            );
-            const renamedFile = this.app.vault.getAbstractFileByPath(
-              newPath
-            );
-            if (renamedFile instanceof TFile && isDotFile(renamedFile)) {
-              await this.openInDevEditor(
-                renamedFile
-              );
-            }
-            this.scheduleExplorerBadgeUpdate();
-          } catch (error) {
-            console.error(
-              "Dev File Editor:",
-              error
-            );
-          }
-        }
+        handleNoteWithExplicitExtension
       )
     );
     this.addCommand({
@@ -1954,6 +2473,18 @@ var DevFileEditorPlugin = class extends Plugin {
       this.app.workspace.on(
         "file-menu",
         (menu, file) => {
+          if (typeof TFolder !== "undefined" && file instanceof TFolder || file && file.children !== void 0) {
+            menu.addItem((item) => {
+              item.setTitle("Cr\xE9er un fichier ici (Red File Editor)").setIcon("file-plus").onClick(() => {
+                new CreateFileModal(
+                  this.app,
+                  this,
+                  file.path
+                ).open();
+              });
+            });
+            return;
+          }
           if (!(file instanceof TFile)) {
             return;
           }
@@ -1995,6 +2526,23 @@ var DevFileEditorPlugin = class extends Plugin {
                 ).open();
               }
             );
+          });
+        }
+      )
+    );
+    this.registerEvent(
+      this.app.workspace.on(
+        "folder-menu",
+        (menu, folder) => {
+          const folderPath = folder ? folder.path : "";
+          menu.addItem((item) => {
+            item.setTitle("Cr\xE9er un fichier ici (Red File Editor)").setIcon("file-plus").onClick(() => {
+              new CreateFileModal(
+                this.app,
+                this,
+                folderPath
+              ).open();
+            });
           });
         }
       )
@@ -2059,6 +2607,9 @@ var DevFileEditorPlugin = class extends Plugin {
     document.documentElement.style.removeProperty(
       "--dev-file-editor-width"
     );
+    if (this.envCompanion) {
+      this.envCompanion.stop();
+    }
     console.log(
       "Unloading Dev File Editor V2"
     );

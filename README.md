@@ -73,15 +73,18 @@ compilation remplace ce dernier.
 | `src/workspace/openFiles.js` | Ouverture des fichiers, activation des onglets et interception des clics |
 | `src/explorer/badges.js` | Étiquettes de type dans l'explorateur |
 | `src/explorer/dotfiles.js` | Affichage des fichiers masqués dans l'explorateur |
+| `src/workspace/envCompanion.js` | Gestion du panneau `.env` compagnon des fichiers YAML |
 | `src/files/operations.js` | Création, renommage, extensions et retrait du suffixe `.md` |
 | `esbuild.config.mjs` | Compilation des sources en un seul `main.js` |
 | `package.json` | Commandes npm et dépendance esbuild |
 | `package-lock.json` | Versions exactes des dépendances pour `npm ci` |
 | `scripts/check.mjs` | Vérification de syntaxe |
 | `tests/startup.test.cjs` | Tests de régression du démarrage et des onglets |
+| `tests/fileCreation.test.cjs` | Tests de création de fichier et gestion d'extensions |
+| `tests/envCompanion.test.cjs` | Tests du panneau `.env` compagnon et de sa fermeture |
 | `main.js` | Plugin généré, prêt à copier dans Obsidian |
 | `manifest.json` | Identité et métadonnées du plugin, inchangées |
-| `styles.css` | Styles originaux, inchangés |
+| `styles.css` | Styles de l'éditeur, des indicateurs et des réglages |
 | `data.json` | Copie des réglages fournis, inchangée |
 
 Les modules `openFiles`, `badges`, `dotfiles` et `operations` exportent des
@@ -90,21 +93,35 @@ groupes de méthodes. `src/main.js` les rattache au prototype du plugin avec
 existants entre méthodes restent valables. Les autres modules exportent
 leurs classes ou fonctions avec `module.exports`.
 
-## Corrections fonctionnelles
+## Corrections et améliorations fonctionnelles
 
-Dans le fichier fourni, `saveSettings()` appelait `saveSettings()` de nouveau,
-créant une récursion infinie. Cet appel est remplacé par
-`await this.saveData(this.settings)` pour enregistrer les réglages.
+### 1. Panneau .env compagnon (YAML)
+- **Fermeture manuelle respectée** : fermer le panneau `.env` (clic sur la croix `X` de l'onglet) enregistre l'intention de l'utilisateur. Le `.env` ne réapparaît plus en boucle ni ne clignote tant que l'on reste sur le même fichier YAML.
+- **Interception des clics résolue** : cliquer, taper ou sélectionner du texte dans l'éditeur YAML n'ouvre plus de panneau `.env` en boucle.
+- **Option dans les paramètres** : activation / désactivation via une bascule dédiée dans l'onglet des réglages (*Ouvrir automatiquement le fichier .env*).
 
-L'installation de l'interception `openFile` utilise directement
-`WorkspaceLeaf.prototype`. Elle ne demande plus d'onglet à `getLeaf(false)`
-au démarrage, ce qui évite de créer un « Nouvel onglet » pendant la restauration.
-La vue `DevFileView` est déclarée navigable avec `navigation = true`.
+### 2. Gestion des extensions de fichiers
+- **Gestionnaire visuel dans les réglages** : affichage de chaque extension sous forme d'étiquette (badge) avec bouton de suppression immédiate.
+- **Ajout personnalisé** : champ de saisie avec normalisation automatique (ex. `toml` -> `.toml`) et vérification des doublons.
+- **Bouton de réinitialisation** : rétablit la liste des extensions par défaut en un clic.
 
-La recherche d'un fichier déjà ouvert consulte `leaf.getViewState()` pour
-retrouver aussi les onglets différés. Leur activation utilise `revealLeaf`
-lorsque cette API est disponible, avec un repli sur `setActiveLeaf`.
-La vue reste une `ItemView`.
+### 3. Expérience utilisateur et productivité dans l'éditeur
+- **Raccourci de sauvegarde manuelle** : `Cmd + S` (macOS) / `Ctrl + S` (Windows/Linux) force une sauvegarde immédiate avec confirmation par notification (`Notice`), en complément de la sauvegarde automatique.
+- **Indicateur de statut d'enregistrement** : affichage en direct dans la barre d'état de l'éditeur (`Enregistré` ou `En cours d'enregistrement...` avec voyant visuel).
+- **Bouton Copier** : bouton d'action dans l'en-tête de l'éditeur permettant de copier tout le contenu dans le presse-papiers avec message de confirmation visuel.
+- **Création de fichier par clic droit sur dossier** : menu contextuel « Créer un fichier ici (Red File Editor) » disponible sur n'importe quel dossier dans l'explorateur de fichiers d'Obsidian.
+
+### 4. Robustesse du démarrage et de la vue
+- Dans le fichier fourni, `saveSettings()` appelait `saveSettings()` de nouveau,
+  créant une récursion infinie. Cet appel est remplacé par
+  `await this.saveData(this.settings)` pour enregistrer les réglages.
+- L'installation de l'interception `openFile` utilise directement
+  `WorkspaceLeaf.prototype`. Elle ne demande plus d'onglet à `getLeaf(false)`
+  au démarrage, ce qui évite de créer un « Nouvel onglet » pendant la restauration.
+- La vue `DevFileView` est déclarée navigable avec `navigation = true`.
+- La recherche d'un fichier déjà ouvert consulte `leaf.getViewState()` pour
+  retrouver aussi les onglets différés. Leur activation utilise `revealLeaf`
+  lorsque cette API est disponible, avec un repli sur `setActiveLeaf`.
 
 Après remplacement du `main.js`, fermer une fois l'éventuel onglet vide déjà
 présent, activer le fichier voulu, puis fermer et relancer Obsidian.
@@ -112,17 +129,8 @@ Ne pas supprimer les fichiers de configuration du workspace.
 
 ## Vérifications
 
-- Compilation esbuild et contrôle de syntaxe.
-- Lors du découpage initial, comparaison des fonctions avec le fichier original.
-- Tests de régression du démarrage et des onglets différés sur les sources
-  et le `main.js` compilé : `npm test`.
-- Comparaison de la coloration syntaxique sur plusieurs langages.
-- Vérification avec une API Obsidian simulée du chargement et de la sauvegarde
-  d'un `.env`, de l'enregistrement des réglages et de la réutilisation d'un
-  onglet existant.
-
-Les vérifications automatiques ne remplacent pas un essai dans Obsidian.
-Après installation, ouvrir un YAML et un `.env`, modifier et enregistrer leur
-contenu, vérifier les fichiers dans l'explorateur et changer la largeur dans
-les paramètres. Fermer puis rouvrir Obsidian pour vérifier le comportement
-avec la version et les autres plugins de votre installation.
+- Compilation esbuild et contrôle de syntaxe (`npm run build` et `npm run check`).
+- Suite de tests complète automatisée : 50 tests unitaires et d'intégration validés
+  sur les modules sources et sur le bundle compilé (`npm test`).
+- Tests de non-régression sur le démarrage, la réutilisation des onglets différés,
+  la suppression du suffixe `.md`, et le cycle de vie du panneau compagnon `.env`.

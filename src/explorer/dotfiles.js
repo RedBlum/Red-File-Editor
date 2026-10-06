@@ -8,8 +8,52 @@ const dotfileMethods = {
 
         const observer =
             new MutationObserver(
-                () => {
-                    this.scheduleHiddenDotFilesUpdate();
+                mutations => {
+                    if (this.hiddenFilesUpdateRunning) {
+                        return;
+                    }
+
+                    let relevant = false;
+                    for (const m of mutations) {
+                        if (
+                            m.target &&
+                            m.target.classList &&
+                            (
+                                m.target.classList.contains("dev-hidden-dotfile") ||
+                                m.target.classList.contains("dev-hidden-dotfile-title") ||
+                                m.target.classList.contains("dev-file-explorer-badge")
+                            )
+                        ) {
+                            continue;
+                        }
+
+                        const allNodes = Array.from(m.addedNodes || []).concat(Array.from(m.removedNodes || []));
+                        const hasSelfElements = allNodes.some(
+                            node =>
+                                node.nodeType === 1 &&
+                                (
+                                    node.classList.contains("dev-hidden-dotfile") ||
+                                    node.classList.contains("dev-file-explorer-badge")
+                                )
+                        );
+
+                        if (hasSelfElements) {
+                            continue;
+                        }
+
+                        if (
+                            m.target &&
+                            m.target.closest &&
+                            m.target.closest('.workspace-leaf-content[data-type="file-explorer"]')
+                        ) {
+                            relevant = true;
+                            break;
+                        }
+                    }
+
+                    if (relevant) {
+                        this.scheduleHiddenDotFilesUpdate();
+                    }
                 }
             );
 
@@ -43,6 +87,11 @@ const dotfileMethods = {
 
 
     scheduleHiddenDotFilesUpdate() {
+        if (this.hiddenFilesUpdateRunning) {
+            this.hiddenFilesNeedsRerun = true;
+            return;
+        }
+
         if (this.hiddenFilesUpdateTimer) {
             clearTimeout(
                 this.hiddenFilesUpdateTimer
@@ -79,9 +128,17 @@ const dotfileMethods = {
                     );
 
                 if (rootContainer) {
+                    const modRoot =
+                        rootContainer.querySelector(
+                            ":scope > .nav-folder.mod-root > .nav-folder-children"
+                        ) ||
+                        rootContainer.querySelector(
+                            ":scope > .tree-item.nav-folder > .tree-item-children"
+                        );
+
                     await this.syncHiddenFilesForFolder(
                         "",
-                        rootContainer
+                        modRoot || rootContainer
                     );
                 }
 
@@ -140,6 +197,10 @@ const dotfileMethods = {
 
         finally {
             this.hiddenFilesUpdateRunning = false;
+            if (this.hiddenFilesNeedsRerun) {
+                this.hiddenFilesNeedsRerun = false;
+                this.scheduleHiddenDotFilesUpdate();
+            }
         }
     },
 
@@ -215,6 +276,34 @@ const dotfileMethods = {
                 continue;
             }
 
+            const name =
+                path.split("/").pop() || path;
+
+            const isEnv =
+                name === ".env" ||
+                name.startsWith(".env.");
+
+            let targetYamlFile = null;
+            if (isEnv) {
+                const targetYamlTitle = Array.from(
+                    container.querySelectorAll(
+                        ":scope > .nav-file > .nav-file-title[data-path], :scope > .tree-item > .tree-item-self[data-path]"
+                    )
+                ).find(el => {
+                    const p = el.getAttribute("data-path") || "";
+                    const fileFolder = p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : "";
+                    return fileFolder === folderPath && /\.(yaml|yml)$/i.test(p);
+                });
+
+                const rawYamlFile = targetYamlTitle
+                    ? (targetYamlTitle.closest(".nav-file") || targetYamlTitle.closest(".tree-item"))
+                    : null;
+
+                targetYamlFile = (rawYamlFile && rawYamlFile.parentElement === container)
+                    ? rawYamlFile
+                    : null;
+            }
+
             const alreadySynthetic =
                 Array.from(
                     container.querySelectorAll(
@@ -229,11 +318,18 @@ const dotfileMethods = {
                 );
 
             if (alreadySynthetic) {
+                if (
+                    isEnv &&
+                    targetYamlFile &&
+                    alreadySynthetic.previousSibling !== targetYamlFile
+                ) {
+                    container.insertBefore(
+                        alreadySynthetic,
+                        targetYamlFile.nextSibling
+                    );
+                }
                 continue;
             }
-
-            const name =
-                path.split("/").pop() || path;
 
             /*
              * Reprendre la structure/classes d'un fichier natif du même
@@ -441,14 +537,20 @@ const dotfileMethods = {
                         )
                     );
 
-            if (firstNormalFile) {
+            if (
+                isEnv &&
+                targetYamlFile
+            ) {
+                container.insertBefore(
+                    fileEl,
+                    targetYamlFile.nextSibling
+                );
+            } else if (firstNormalFile && firstNormalFile.parentElement === container) {
                 container.insertBefore(
                     fileEl,
                     firstNormalFile
                 );
-            }
-
-            else {
+            } else {
                 container.appendChild(
                     fileEl
                 );
